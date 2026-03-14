@@ -11,10 +11,15 @@ from dotenv import load_dotenv
 import os
 from typing import Literal
 import json
+<<<<<<< Updated upstream
 import base64
 from urllib import error, request as urllib_request
 
 load_dotenv()
+=======
+import requests
+import base64
+>>>>>>> Stashed changes
 
 app = FastAPI(title="MicroLesson AI API")
 
@@ -109,18 +114,79 @@ Format for AUDIO narration:
     elif style == "visual":
         return f"""{base_requirements}
 
-Format as EXACTLY 5 SLIDES in JSON format:
+Format as EXACTLY 5 SLIDES in JSON format with image prompts:
 [
-  {{"title": "Introduction: [Topic]", "text": "Hook + overview (2-3 sentences)"}},
-  {{"title": "Key Concept 1: [Name]", "text": "Explanation (2-3 sentences)"}},
-  {{"title": "Key Concept 2: [Name]", "text": "Explanation (2-3 sentences)"}},
-  {{"title": "Key Concept 3: [Name]", "text": "Explanation (2-3 sentences)"}},
-  {{"title": "Summary & Takeaway", "text": "Recap + key message (2-3 sentences)"}}
+  {{
+    "title": "Introduction: [Topic]",
+    "text": "Hook + overview (2-3 sentences)",
+    "image_prompt": "A simple, educational illustration representing [topic introduction]"
+  }},
+  {{
+    "title": "Key Concept 1: [Name]",
+    "text": "Explanation (2-3 sentences)",
+    "image_prompt": "Visual representation of [concept 1]"
+  }},
+  {{
+    "title": "Key Concept 2: [Name]",
+    "text": "Explanation (2-3 sentences)",
+    "image_prompt": "Visual representation of [concept 2]"
+  }},
+  {{
+    "title": "Key Concept 3: [Name]",
+    "text": "Explanation (2-3 sentences)",
+    "image_prompt": "Visual representation of [concept 3]"
+  }},
+  {{
+    "title": "Summary & Takeaway",
+    "text": "Recap + key message (2-3 sentences)",
+    "image_prompt": "Summary visualization of [topic]"
+  }}
 ]
 
+IMPORTANT: Each image_prompt should be a clear, concise description (5-10 words) for AI image generation.
 Return ONLY valid JSON array, no other text."""
 
     return base_requirements
+
+
+def generate_image_hf(prompt: str) -> str:
+    """
+    Generate image using Hugging Face Inference API
+
+    Args:
+        prompt: Text description for image generation
+
+    Returns:
+        Base64 encoded image string
+    """
+    API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
+    hf_token = os.getenv("HUGGINGFACE_API_KEY")
+
+    # If no HF token, return a placeholder
+    if not hf_token:
+        return "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2Y1ZjdmYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2NjdlZWEiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBQbGFjZWhvbGRlcjwvdGV4dD48L3N2Zz4="
+
+    headers = {"Authorization": f"Bearer {hf_token}"}
+
+    try:
+        response = requests.post(
+            API_URL,
+            headers=headers,
+            json={"inputs": prompt},
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            # Convert image bytes to base64
+            image_bytes = response.content
+            base64_image = base64.b64encode(image_bytes).decode('utf-8')
+            return f"data:image/png;base64,{base64_image}"
+        else:
+            # Return placeholder on error
+            return "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2Y1ZjdmYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2NjdlZWEiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBVbmF2YWlsYWJsZTwvdGV4dD48L3N2Zz4="
+    except Exception as e:
+        print(f"Image generation error: {e}")
+        return "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2Y1ZjdmYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2NjdlZWEiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBFcnJvcjwvdGV4dD48L3N2Zz4="
 
 
 def call_claude_api(prompt: str) -> str:
@@ -276,6 +342,12 @@ async def generate_lesson(request: LessonRequest):
             # Validate slides structure
             if not isinstance(slides, list) or len(slides) != 5:
                 raise ValueError("Expected exactly 5 slides")
+
+            # Generate images for each slide
+            for slide in slides:
+                if "image_prompt" in slide:
+                    # Generate image using Hugging Face
+                    slide["image"] = generate_image_hf(slide["image_prompt"])
 
             return {
                 "type": "slides",

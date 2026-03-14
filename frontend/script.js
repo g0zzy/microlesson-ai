@@ -183,6 +183,7 @@ function renderSlides(slidesData, topic) {
 
     const slidesHTML = slides.map((slide, index) => `
         <div class="slide ${index === 0 ? 'active' : ''}" data-slide="${index}">
+            ${slide.image ? `<img src="${slide.image}" alt="${slide.title}" class="slide-image" />` : ''}
             <h2>${slide.title}</h2>
             <p>${slide.text}</p>
         </div>
