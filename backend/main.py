@@ -11,15 +11,10 @@ from dotenv import load_dotenv
 import os
 from typing import Literal
 import json
-<<<<<<< Updated upstream
 import base64
 from urllib import error, request as urllib_request
 
 load_dotenv()
-=======
-import requests
-import base64
->>>>>>> Stashed changes
 
 app = FastAPI(title="MicroLesson AI API")
 
@@ -37,6 +32,11 @@ client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb")
 ELEVENLABS_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_IMAGE_MODEL = os.getenv("OPENAI_IMAGE_MODEL", "dall-e-3")
+OPENAI_IMAGE_SIZE = os.getenv("OPENAI_IMAGE_SIZE", "1024x1024")
+OPENAI_IMAGE_QUALITY = os.getenv("OPENAI_IMAGE_QUALITY", "standard")
+OPENAI_IMAGE_STYLE = os.getenv("OPENAI_IMAGE_STYLE", "natural")
 
 
 class LessonRequest(BaseModel):
@@ -149,44 +149,86 @@ Return ONLY valid JSON array, no other text."""
     return base_requirements
 
 
-def generate_image_hf(prompt: str) -> str:
+def image_placeholder(label: str) -> str:
     """
-    Generate image using Hugging Face Inference API
+    Return a lightweight inline SVG placeholder for failed image generation.
+
+    Args:
+        label: Centered text to display in the placeholder image
+
+    Returns:
+        Data URL for an SVG image
+    """
+    svg = f"""
+    <svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+      <rect width="400" height="300" fill="#f5f7fa" />
+      <text x="50%" y="50%" font-family="Arial" font-size="18" fill="#667eea" text-anchor="middle" dy=".3em">{label}</text>
+    </svg>
+    """.strip()
+    return f"data:image/svg+xml;base64,{base64.b64encode(svg.encode('utf-8')).decode('ascii')}"
+
+
+def generate_image_openai(prompt: str) -> str:
+    """
+    Generate an educational slide image using the OpenAI Images API.
 
     Args:
         prompt: Text description for image generation
 
     Returns:
-        Base64 encoded image string
+        Data URL for the generated image
     """
-    API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
-    hf_token = os.getenv("HUGGINGFACE_API_KEY")
+    if not OPENAI_API_KEY:
+        return image_placeholder("OpenAI API Key Missing")
 
-    # If no HF token, return a placeholder
-    if not hf_token:
-        return "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2Y1ZjdmYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2NjdlZWEiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBQbGFjZWhvbGRlcjwvdGV4dD48L3N2Zz4="
+    endpoint = "https://api.openai.com/v1/images/generations"
+    prompt_text = (
+        "Create a clean, educational illustration for a lesson slide. "
+        "Use simple composition, clear subject focus, and no text labels. "
+        f"Prompt: {prompt}"
+    )
+    payload_dict = {
+        "model": OPENAI_IMAGE_MODEL,
+        "prompt": prompt_text,
+        "size": OPENAI_IMAGE_SIZE,
+        "n": 1
+    }
 
-    headers = {"Authorization": f"Bearer {hf_token}"}
+    if OPENAI_IMAGE_MODEL == "dall-e-3":
+        payload_dict["quality"] = OPENAI_IMAGE_QUALITY
+        payload_dict["style"] = OPENAI_IMAGE_STYLE
+        payload_dict["response_format"] = "b64_json"
+    else:
+        payload_dict["quality"] = OPENAI_IMAGE_QUALITY
+
+    payload = json.dumps(payload_dict).encode("utf-8")
+
+    req = urllib_request.Request(
+        endpoint,
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
 
     try:
-        response = requests.post(
-            API_URL,
-            headers=headers,
-            json={"inputs": prompt},
-            timeout=30
-        )
+        with urllib_request.urlopen(req, timeout=60) as response:
+            body = json.loads(response.read().decode("utf-8"))
 
-        if response.status_code == 200:
-            # Convert image bytes to base64
-            image_bytes = response.content
-            base64_image = base64.b64encode(image_bytes).decode('utf-8')
-            return f"data:image/png;base64,{base64_image}"
-        else:
-            # Return placeholder on error
-            return "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2Y1ZjdmYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2NjdlZWEiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBVbmF2YWlsYWJsZTwvdGV4dD48L3N2Zz4="
-    except Exception as e:
-        print(f"Image generation error: {e}")
-        return "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2Y1ZjdmYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2NjdlZWEiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBFcnJvcjwvdGV4dD48L3N2Zz4="
+        data = body.get("data", [])
+        if data and data[0].get("b64_json"):
+            return f"data:image/png;base64,{data[0]['b64_json']}"
+
+        return image_placeholder("Image Unavailable")
+    except error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        print(f"OpenAI image generation error: {detail or exc.reason}")
+        return image_placeholder("Image Unavailable")
+    except Exception as exc:
+        print(f"OpenAI image generation error: {exc}")
+        return image_placeholder("Image Error")
 
 
 def call_claude_api(prompt: str) -> str:
@@ -346,8 +388,7 @@ async def generate_lesson(request: LessonRequest):
             # Generate images for each slide
             for slide in slides:
                 if "image_prompt" in slide:
-                    # Generate image using Hugging Face
-                    slide["image"] = generate_image_hf(slide["image_prompt"])
+                    slide["image"] = generate_image_openai(slide["image_prompt"])
 
             return {
                 "type": "slides",
@@ -367,14 +408,16 @@ async def health_check():
     """Detailed health check for deployment"""
     anthropic_api_key_set = bool(os.getenv("ANTHROPIC_API_KEY"))
     elevenlabs_api_key_set = bool(ELEVENLABS_API_KEY)
+    openai_api_key_set = bool(OPENAI_API_KEY)
     return {
-        "status": "healthy" if anthropic_api_key_set and elevenlabs_api_key_set else "degraded",
+        "status": "healthy" if anthropic_api_key_set and elevenlabs_api_key_set and openai_api_key_set else "degraded",
         "anthropic_api_key_configured": anthropic_api_key_set,
         "elevenlabs_api_key_configured": elevenlabs_api_key_set,
+        "openai_api_key_configured": openai_api_key_set,
         "message": (
             "Ready to generate lessons"
-            if anthropic_api_key_set and elevenlabs_api_key_set
-            else "ANTHROPIC_API_KEY or ELEVENLABS_API_KEY not set"
+            if anthropic_api_key_set and elevenlabs_api_key_set and openai_api_key_set
+            else "ANTHROPIC_API_KEY, ELEVENLABS_API_KEY, or OPENAI_API_KEY not set"
         )
     }
 
