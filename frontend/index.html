@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MicroLesson AI - Learn Anything in 5 Minutes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .input-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            font-size: 1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .style-options {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .style-option {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .style-option input[type="radio"] {
+            display: none;
+        }
+
+        .style-option label {
+            display: block;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+            background: #f9f9f9;
+        }
+
+        .style-option input[type="radio"]:checked + label {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .style-option label:hover {
+            border-color: #764ba2;
+        }
+
+        .icon {
+            font-size: 2rem;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #result {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: none;
+        }
+
+        #result.show {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Text lesson styles */
+        .text-content {
+            line-height: 1.8;
+            font-size: 1.05rem;
+        }
+
+        .text-content h2 {
+            color: #667eea;
+            margin: 20px 0 10px;
+        }
+
+        .text-content p {
+            margin-bottom: 15px;
+        }
+
+        /* Voice lesson styles */
+        .voice-content {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .audio-controls {
+            margin: 30px 0;
+        }
+
+        .play-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .play-btn:hover {
+            background: #764ba2;
+            transform: scale(1.05);
+        }
+
+        .transcript {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            text-align: left;
+            line-height: 1.8;
+        }
+
+        /* Slide styles */
+        .slides-container {
+            position: relative;
+        }
+
+        .slide {
+            display: none;
+            padding: 40px;
+            min-height: 300px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 12px;
+        }
+
+        .slide.active {
+            display: block;
+            animation: slideIn 0.5s;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .slide h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+
+        .slide p {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: #555;
+        }
+
+        .slide-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 30px;
+        }
+
+        .slide-nav button {
+            width: auto;
+            padding: 10px 25px;
+            font-size: 1rem;
+        }
+
+        .slide-counter {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #fcc;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+
+            .style-options {
+                flex-direction: column;
+            }
+
+            .input-section {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MicroLesson AI</h1>
+            <p class="subtitle">Learn anything in 5 minutes with AI-powered lessons</p>
+        </header>
+
+        <div class="input-section">
+            <form id="lessonForm">
+                <div class="form-group">
+                    <label for="topic">What do you want to learn?</label>
+                    <input
+                        type="text"
+                        id="topic"
+                        name="topic"
+                        placeholder="e.g., Quantum Computing, Photosynthesis, JavaScript Closures..."
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label>Choose your learning style:</label>
+                    <div class="style-options">
+                        <div class="style-option">
+                            <input type="radio" id="text" name="style" value="text" checked>
+                            <label for="text">
+                                <span class="icon">📖</span>
+                                Text
+                            </label>
+                        </div>
+                        <div class="style-option">
+                            <input type="radio" id="voice" name="style" value="voice">
+                            <label for="voice">
+                                <span class="icon">🎧</span>
+                                Voice
+                            </label>
+                        </div>
+                        <div class="style-option">
+                            <input type="radio" id="visual" name="style" value="visual">
+                            <label for="visual">
+                                <span class="icon">📊</span>
+                                Visual
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" id="generateBtn">Generate Lesson</button>
+            </form>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
