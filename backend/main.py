@@ -7,9 +7,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from anthropic import Anthropic
+from dotenv import load_dotenv
 import os
 from typing import Literal
 import json
+import base64
+from urllib import error, request as urllib_request
+
+load_dotenv()
 
 app = FastAPI(title="MicroLesson AI API")
 
@@ -24,6 +29,9 @@ app.add_middleware(
 
 # Initialize Claude client
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb")
+ELEVENLABS_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
 
 
 class LessonRequest(BaseModel):
@@ -48,6 +56,14 @@ class VisualResponse(BaseModel):
     """Response model for visual lessons"""
     type: str
     slides: list[SlideContent]
+
+
+class VoiceResponse(BaseModel):
+    """Response model for voice lessons"""
+    type: str
+    content: str
+    audio_base64: str
+    mime_type: str
 
 
 def generate_lesson_prompt(topic: str, style: str) -> str:
@@ -134,6 +150,65 @@ def call_claude_api(prompt: str) -> str:
         )
 
 
+def synthesize_speech(text: str) -> tuple[str, str]:
+    """
+    Convert lesson text into speech using the ElevenLabs API.
+
+    Args:
+        text: Narration text to synthesize
+
+    Returns:
+        Tuple of base64-encoded audio data and MIME type
+    """
+    if not ELEVENLABS_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="ELEVENLABS_API_KEY not set"
+        )
+
+    endpoint = (
+        f"https://api.elevenlabs.io/v1/text-to-speech/"
+        f"{ELEVENLABS_VOICE_ID}?output_format=mp3_44100_128"
+    )
+    payload = json.dumps({
+        "text": text,
+        "model_id": ELEVENLABS_MODEL_ID,
+        "voice_settings": {
+            "stability": 0.45,
+            "similarity_boost": 0.8
+        }
+    }).encode("utf-8")
+
+    req = urllib_request.Request(
+        endpoint,
+        data=payload,
+        headers={
+            "Accept": "audio/mpeg",
+            "Content-Type": "application/json",
+            "xi-api-key": ELEVENLABS_API_KEY
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib_request.urlopen(req) as response:
+            audio_bytes = response.read()
+            mime_type = response.headers.get_content_type() or "audio/mpeg"
+            audio_base64 = base64.b64encode(audio_bytes).decode("ascii")
+            return audio_base64, mime_type
+    except error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        raise HTTPException(
+            status_code=500,
+            detail=f"ElevenLabs API error: {detail or exc.reason}"
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"ElevenLabs API error: {str(exc)}"
+        )
+
+
 @app.get("/")
 async def root():
     """Health check endpoint"""
@@ -177,10 +252,12 @@ async def generate_lesson(request: LessonRequest):
         }
 
     elif request.style == "voice":
-        # For voice, return text that frontend will convert to speech
+        audio_base64, mime_type = synthesize_speech(claude_response)
         return {
             "type": "voice",
-            "content": claude_response
+            "content": claude_response,
+            "audio_base64": audio_base64,
+            "mime_type": mime_type
         }
 
     elif request.style == "visual":
@@ -216,11 +293,17 @@ async def generate_lesson(request: LessonRequest):
 @app.get("/health")
 async def health_check():
     """Detailed health check for deployment"""
-    api_key_set = bool(os.getenv("ANTHROPIC_API_KEY"))
+    anthropic_api_key_set = bool(os.getenv("ANTHROPIC_API_KEY"))
+    elevenlabs_api_key_set = bool(ELEVENLABS_API_KEY)
     return {
-        "status": "healthy" if api_key_set else "degraded",
-        "api_key_configured": api_key_set,
-        "message": "Ready to generate lessons" if api_key_set else "ANTHROPIC_API_KEY not set"
+        "status": "healthy" if anthropic_api_key_set and elevenlabs_api_key_set else "degraded",
+        "anthropic_api_key_configured": anthropic_api_key_set,
+        "elevenlabs_api_key_configured": elevenlabs_api_key_set,
+        "message": (
+            "Ready to generate lessons"
+            if anthropic_api_key_set and elevenlabs_api_key_set
+            else "ANTHROPIC_API_KEY or ELEVENLABS_API_KEY not set"
+        )
     }
 
 

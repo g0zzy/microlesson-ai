@@ -20,11 +20,11 @@ MicroLesson AI is a hackathon-ready web app that generates personalized 5-minute
 ### Backend
 - **FastAPI**: Modern Python web framework
 - **Claude API**: AI content generation (Sonnet 4.5)
+- **ElevenLabs API**: Server-side text-to-speech for voice lessons
 - **Pydantic**: Data validation
 
 ### Frontend
 - **Vanilla HTML/CSS/JavaScript**: No framework dependencies
-- **Web Speech API**: Browser-native text-to-speech
 - **Responsive Design**: Works on desktop and mobile
 
 ## Project Structure
@@ -47,6 +47,7 @@ microlesson-ai/
 
 - Python 3.9+
 - Anthropic API Key ([Get one here](https://console.anthropic.com/))
+- ElevenLabs API Key ([Get one here](https://elevenlabs.io/))
 
 ### Installation
 
@@ -65,6 +66,7 @@ microlesson-ai/
    Create a `.env` file in the project root:
    ```bash
    ANTHROPIC_API_KEY=your_api_key_here
+   ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
    ```
 
    Or export directly:
@@ -143,7 +145,9 @@ Generate a personalized lesson.
 ```json
 {
   "type": "voice",
-  "content": "Welcome to this lesson on quantum computing..."
+  "content": "Welcome to this lesson on quantum computing...",
+  "audio_base64": "<base64 mp3>",
+  "mime_type": "audio/mpeg"
 }
 ```
 
@@ -194,7 +198,7 @@ The backend uses specialized prompts for each learning style:
 
 ### Text-to-Speech
 
-The voice feature uses the **Web Speech API** (`SpeechSynthesis`), which is built into modern browsers. No additional API keys needed!
+The voice feature uses the **ElevenLabs Text-to-Speech API**. The backend generates the narration audio and returns it to the frontend as a base64-encoded MP3 alongside the transcript.
 
 ## Deployment
 

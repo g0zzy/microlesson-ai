@@ -9,8 +9,6 @@ const API_URL = 'http://localhost:8000';
 // Global state
 let currentSlideIndex = 0;
 let slides = [];
-let speechSynthesis = window.speechSynthesis;
-let currentUtterance = null;
 
 // DOM Elements
 const form = document.getElementById('lessonForm');
@@ -62,6 +60,8 @@ async function handleFormSubmit(e) {
         if (data.type === 'text') {
             renderTextLesson(data.content, topic);
         } else if (data.type === 'voice') {
+            window.currentLessonAudioBase64 = data.audio_base64;
+            window.currentLessonMimeType = data.mime_type;
             renderVoiceLesson(data.content, topic);
         } else if (data.type === 'slides') {
             renderSlides(data.slides, topic);
@@ -148,18 +148,21 @@ function formatTextContent(content) {
  * Render voice lesson with TTS
  */
 function renderVoiceLesson(content, topic) {
+    const audioBase64 = window.currentLessonAudioBase64;
+    const mimeType = window.currentLessonMimeType || 'audio/mpeg';
+    const audioSrc = `data:${mimeType};base64,${audioBase64}`;
+
     resultDiv.innerHTML = `
         <div class="voice-content">
             <h1>🎧 ${topic}</h1>
             <hr style="margin: 20px 0; border: none; border-top: 2px solid #667eea;">
 
             <div class="audio-controls">
-                <button class="play-btn" id="playBtn" onclick="toggleSpeech()">
-                    ▶️ Play Lesson
-                </button>
-                <p style="margin-top: 15px; color: #666;">
-                    <span id="status">Ready to play</span>
-                </p>
+                <audio controls preload="metadata" style="width: 100%;">
+                    <source src="${audioSrc}" type="${mimeType}">
+                    Your browser does not support audio playback.
+                </audio>
+                <p style="margin-top: 15px; color: #666;">Narration generated with ElevenLabs</p>
             </div>
 
             <div class="transcript">
@@ -168,54 +171,7 @@ function renderVoiceLesson(content, topic) {
             </div>
         </div>
     `;
-
-    // Store content for TTS
-    window.currentLessonContent = content;
     resultDiv.classList.add('show');
-}
-
-/**
- * Toggle speech playback
- */
-function toggleSpeech() {
-    const playBtn = document.getElementById('playBtn');
-    const status = document.getElementById('status');
-
-    // Stop if already speaking
-    if (speechSynthesis.speaking) {
-        speechSynthesis.cancel();
-        playBtn.innerHTML = '▶️ Play Lesson';
-        status.textContent = 'Stopped';
-        return;
-    }
-
-    // Create new utterance
-    currentUtterance = new SpeechSynthesisUtterance(window.currentLessonContent);
-
-    // Configure voice settings
-    currentUtterance.rate = 0.9; // Slightly slower for clarity
-    currentUtterance.pitch = 1.0;
-    currentUtterance.volume = 1.0;
-
-    // Event handlers
-    currentUtterance.onstart = () => {
-        playBtn.innerHTML = '⏸️ Pause';
-        status.textContent = 'Playing...';
-    };
-
-    currentUtterance.onend = () => {
-        playBtn.innerHTML = '▶️ Play Again';
-        status.textContent = 'Finished';
-    };
-
-    currentUtterance.onerror = (event) => {
-        console.error('Speech error:', event);
-        playBtn.innerHTML = '▶️ Play Lesson';
-        status.textContent = 'Error playing audio';
-    };
-
-    // Start speaking
-    speechSynthesis.speak(currentUtterance);
 }
 
 /**
